@@ -1,6 +1,5 @@
 import "./globals.css";
 import { Manrope } from "next/font/google";
-import NavigationWrapper from "@/components/Navigation";
 
 const manrope = Manrope({
   subsets: ["latin"],
@@ -29,11 +28,7 @@ export default function RootLayout({
       <body
         className={`${manrope.variable} bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 antialiased`}
       >
-        <NavigationWrapper userRole={"admin"} />
-        {/* Fixed: Changed from mr-72 to mr-80 to match sidebar width (w-80 = 20rem = 320px) */}
-        <main className="lg:mr-80 min-h-screen transition-all duration-300">
-          {children}
-        </main>
+        {children}
       </body>
     </html>
   );

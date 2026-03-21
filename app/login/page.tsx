@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Handshake, Mail, Eye, EyeOff, LogIn, Lock, X } from 'lucide-react';
 
@@ -12,10 +12,64 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showForgotDialog, setShowForgotDialog] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
-  const handleBack = () => {
-    router.push('/');
+  // Helper function to check if token is expired
+  const isTokenExpired = (token: string): boolean => {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      // Check if token expiry exists and is in the past
+      return payload.exp ? payload.exp * 1000 < Date.now() : false;
+    } catch {
+      return true; // If we can't decode the token, consider it expired
+    }
   };
+
+  // Check if user is already logged in
+  useEffect(() => {
+    const checkAuth = () => {
+      try {
+        const token = localStorage.getItem('token');
+        const userStr = localStorage.getItem('user');
+
+        if (!token || !userStr) {
+          setIsCheckingAuth(false);
+          return;
+        }
+
+        // Check if token is expired
+        if (isTokenExpired(token)) {
+          // Token is expired, clear storage
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          setIsCheckingAuth(false);
+          return;
+        }
+
+        const user = JSON.parse(userStr);
+
+        // Redirect based on role
+        if (user.role === 'BROTHER') {
+          router.push('/brother/dashboard');
+        } else if (user.role === 'ADMIN') {
+          router.push('/admin/dashboard');
+        } else {
+          router.push('/dashboard');
+        }
+      } catch (error) {
+        console.error('Auth check error:', error);
+        // Clear potentially corrupted data
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setIsCheckingAuth(false);
+      }
+    };
+
+    // Small delay to ensure router is ready
+    const timer = setTimeout(checkAuth, 100);
+    return () => clearTimeout(timer);
+  }, [router]);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,13 +96,14 @@ export default function LoginPage() {
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
 
-      // Redirect based on role
+      // Redirect based on role - using the role-specific layouts
       if (data.user.role === 'BROTHER') {
-        router.push('/brother');
+        router.push('/brother/dashboard');
       } else if (data.user.role === 'ADMIN') {
         router.push('/admin/dashboard');
       } else {
-        router.push('brother/dashboard');
+        // Fallback for any other role
+        router.push('/dashboard');
       }
       
     } catch (err: any) {
@@ -67,21 +122,26 @@ export default function LoginPage() {
     window.open(whatsappUrl, '_blank');
   };
 
+  // Show loading state while checking authentication
+  if (isCheckingAuth) {
+    return (
+      <div className="bg-[#f6f6f8] dark:bg-[#101622] font-[Manrope,sans-serif] min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-[#135bec] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-slate-600 dark:text-slate-400">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-[#f6f6f8] dark:bg-[#101622] font-[Manrope,sans-serif] min-h-screen flex flex-col">
       {/* Top Navigation Bar (iOS Style) */}
       <header className="flex items-center justify-between p-4 bg-[#f6f6f8] dark:bg-[#101622]">
-        <button
-          onClick={handleBack}
-          className="p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full transition-colors cursor-pointer"
-          aria-label="Go back"
-        >
-          <ArrowLeft className="w-5 h-5 text-slate-900 dark:text-slate-100" />
-        </button>
         <h2 className="text-slate-900 dark:text-slate-100 text-lg font-bold leading-tight flex-1 text-center">
           Brotherhood Fund
         </h2>
-        <div className="w-9" /> {/* Spacer for alignment */}
+        <div/> {/* Spacer for alignment */}
       </header>
 
       <main className="flex-1 flex flex-col items-center justify-center px-6 pb-12">
@@ -193,7 +253,7 @@ export default function LoginPage() {
             Facing issues?
           </p>
           <button
-            onClick={() => openWhatsApp('+1234567890')} // Replace with actual contact number
+            onClick={() => openWhatsApp('+918447060472')}
             className="inline-flex items-center justify-center px-6 py-3 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm font-bold transition-colors hover:bg-slate-300 dark:hover:bg-slate-700 cursor-pointer"
           >
             Contact Admin
@@ -231,7 +291,7 @@ export default function LoginPage() {
 
             <div className="space-y-3">
               <button
-                onClick={() => openWhatsApp('+1987654321')} // Replace with Head Brother's number
+                onClick={() => openWhatsApp('+918447060472')} // Replace with Head Brother's number
                 className="w-full py-3 px-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer"
               >
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
