@@ -41,7 +41,7 @@ interface ContributionResponse {
 
 const menuItems = [
   { name: "Home", icon: Home, path: "/brother/dashboard" },
-  { name: "History", icon: LayoutDashboard, path: "/brother/contributionHistory", badge: "" },
+  { name: "History", icon: LayoutDashboard, path: "/brother/contributionHistory"},
   { name: "Profile", icon: User, path: "/brother/profile" },
 ];
 
@@ -67,7 +67,6 @@ export default function BrotherNavigation() {
   useEffect(() => {
     setMounted(true);
     fetchProfile();
-    fetchContributionCount();
   }, []);
 
   const fetchProfile = async () => {
@@ -105,39 +104,6 @@ export default function BrotherNavigation() {
       setError(err instanceof Error ? err.message : 'Failed to load profile');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchContributionCount = async () => {
-    try {
-      setLoadingContributions(true);
-      const token = localStorage.getItem("token");
-      
-      if (!token) return;
-
-      const response = await fetch(`${API_BASE_URL}/api/brother/mycontribution/history`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch contributions');
-      }
-
-      const data: ContributionResponse = await response.json();
-      setContributionCount(data.total);
-      
-      // Update the menu item badge with the total count
-      const historyItem = menuItems.find(item => item.name === "History");
-      if (historyItem && data.total > 0) {
-        historyItem.badge = data.total.toString();
-      }
-    } catch (err) {
-      console.error('Error fetching contribution count:', err);
-    } finally {
-      setLoadingContributions(false);
     }
   };
 
@@ -290,11 +256,6 @@ export default function BrotherNavigation() {
                 >
                   <Icon className="w-5 h-5" />
                   <span className="font-medium flex-1 text-left">{item.name}</span>
-                  {item.badge && item.badge !== "" && (
-                    <span className="text-xs font-bold px-2 py-1 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 text-white">
-                      {item.badge}
-                    </span>
-                  )}
                   {item.name === "History" && loadingContributions && (
                     <span className="text-xs px-2 py-1 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400">
                       <Loader2 className="w-3 h-3 animate-spin" />
