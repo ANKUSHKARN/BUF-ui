@@ -15,7 +15,11 @@ import {
   Image as ImageIcon,
   Loader2,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Copy,
+  Check,
+  Building2,
+  QrCode
 } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
@@ -50,10 +54,16 @@ interface ContributionPreview {
   waiverWillBeUsed: number;
 }
 
-interface ContributionProof {
-  fileUrl: string;
-  filePublicId: string;
-}
+// Hardcoded bank details
+const BANK_DETAILS = {
+  accountHolderName: "Sonu kumar karn",
+  bankName: "Punjab National Bank",
+  accountNumber: "2399001500003527",
+  ifscCode: "PUNB0239900",
+  upiId: "8447060472@ptyes"
+};
+
+const QR_CODE_URL = "https://res.cloudinary.com/dmwncyyys/image/upload/v1775216205/WhatsApp_Image_2026-04-03_at_16.56.37_jrxq2m.jpg"; 
 
 export default function BrotherDashboard() {
   const router = useRouter();
@@ -72,8 +82,14 @@ export default function BrotherDashboard() {
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Copy state
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'bank' | 'qr'>('bank');
 
   // Get user initials for avatar
   const [userInitials, setUserInitials] = useState('JD');
@@ -163,12 +179,21 @@ export default function BrotherDashboard() {
     }
   };
 
+  const handleCopyToClipboard = async (text: string, field: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
   const handleContributeClick = () => {
     setShowContributeModal(true);
     setSelectedFiles([]);
     setPreviewUrls([]);
     setSubmitError(null);
-    setSubmitSuccess(false);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -258,22 +283,26 @@ export default function BrotherDashboard() {
         throw new Error(data.message || 'Failed to submit contribution');
       }
 
-      setSubmitSuccess(true);
+      // Close the contribution modal
+      setShowContributeModal(false);
+      
+      // Clear selected files
+      setSelectedFiles([]);
+      setPreviewUrls([]);
+      
+      // Show success dialog
+      setShowSuccessDialog(true);
       
       // Refresh dashboard data after successful submission
       await fetchDashboardData();
 
-      // Close modal after 2 seconds
+      // Auto close success dialog after 3 seconds
       setTimeout(() => {
-        setShowContributeModal(false);
-        setSelectedFiles([]);
-        setPreviewUrls([]);
-        setSubmitSuccess(false);
-      }, 2000);
+        setShowSuccessDialog(false);
+      }, 3000);
 
     } catch (err: any) {
       setSubmitError(err.message);
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -286,6 +315,9 @@ export default function BrotherDashboard() {
 
   // Check if there's any pending contribution
   const hasPendingContribution = (myContribution?.pendingContribution || 0) > 0;
+  
+  // Check if there's any amount needed to pay (preview exists and total payable > 0)
+  const hasAmountToPay = preview && preview.months.length > 0 && preview.totalPayable > 0;
 
   if (!mounted || isLoading) {
     return (
@@ -329,10 +361,6 @@ export default function BrotherDashboard() {
           </h1>
         </div>
         <div className="flex items-center gap-1">
-          {/* <button className="flex size-9 cursor-pointer items-center justify-center rounded-lg bg-transparent text-slate-900 dark:text-slate-100 relative">
-            <Bell className="w-5 h-5" />
-            <span className="absolute top-2 right-2 size-2 bg-red-500 rounded-full"></span>
-          </button> */}
           <div className="size-8 rounded-full bg-[#135bec] flex items-center justify-center text-white font-bold text-sm border-2 border-white dark:border-slate-800 shadow-sm">
             {userInitials}
           </div>
@@ -394,8 +422,162 @@ export default function BrotherDashboard() {
           </div>
         </div>
 
+        {/* Bank Details and QR Code Section - Only show if there's amount to pay AND no pending contribution */}
+        {hasAmountToPay && !hasPendingContribution && (
+          <div className="mb-6">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+              {/* Tabs */}
+              <div className="flex border-b border-slate-200 dark:border-slate-700">
+                <button
+                  onClick={() => setActiveTab('bank')}
+                  className={`flex-1 py-4 text-sm font-semibold transition-colors relative ${
+                    activeTab === 'bank'
+                      ? 'text-[#135bec]'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-center gap-2">
+                    <Building2 className="w-4 h-4" />
+                    Bank Details
+                  </div>
+                  {activeTab === 'bank' && (
+                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#135bec]"></div>
+                  )}
+                </button>
+                <button
+                  onClick={() => setActiveTab('qr')}
+                  className={`flex-1 py-4 text-sm font-semibold transition-colors relative ${
+                    activeTab === 'qr'
+                      ? 'text-[#135bec]'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-center gap-2">
+                    <QrCode className="w-4 h-4" />
+                    QR Code
+                  </div>
+                  {activeTab === 'qr' && (
+                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#135bec]"></div>
+                  )}
+                </button>
+              </div>
+
+              {/* Tab Content */}
+              <div className="p-6">
+                {activeTab === 'bank' ? (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-900 rounded-lg">
+                      <div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Account Holder Name</p>
+                        <p className="text-slate-900 dark:text-white font-medium">{BANK_DETAILS.accountHolderName}</p>
+                      </div>
+                      <button
+                        onClick={() => handleCopyToClipboard(BANK_DETAILS.accountHolderName, 'accountHolderName')}
+                        className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                      >
+                        {copiedField === 'accountHolderName' ? (
+                          <Check className="w-4 h-4 text-emerald-500" />
+                        ) : (
+                          <Copy className="w-4 h-4 text-slate-400" />
+                        )}
+                      </button>
+                    </div>
+
+                    <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-900 rounded-lg">
+                      <div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Bank Name</p>
+                        <p className="text-slate-900 dark:text-white font-medium">{BANK_DETAILS.bankName}</p>
+                      </div>
+                      <button
+                        onClick={() => handleCopyToClipboard(BANK_DETAILS.bankName, 'bankName')}
+                        className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                      >
+                        {copiedField === 'bankName' ? (
+                          <Check className="w-4 h-4 text-emerald-500" />
+                        ) : (
+                          <Copy className="w-4 h-4 text-slate-400" />
+                        )}
+                      </button>
+                    </div>
+
+                    <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-900 rounded-lg">
+                      <div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Account Number</p>
+                        <p className="text-slate-900 dark:text-white font-mono font-medium">{BANK_DETAILS.accountNumber}</p>
+                      </div>
+                      <button
+                        onClick={() => handleCopyToClipboard(BANK_DETAILS.accountNumber, 'accountNumber')}
+                        className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                      >
+                        {copiedField === 'accountNumber' ? (
+                          <Check className="w-4 h-4 text-emerald-500" />
+                        ) : (
+                          <Copy className="w-4 h-4 text-slate-400" />
+                        )}
+                      </button>
+                    </div>
+
+                    <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-900 rounded-lg">
+                      <div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">IFSC Code</p>
+                        <p className="text-slate-900 dark:text-white font-mono font-medium">{BANK_DETAILS.ifscCode}</p>
+                      </div>
+                      <button
+                        onClick={() => handleCopyToClipboard(BANK_DETAILS.ifscCode, 'ifscCode')}
+                        className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                      >
+                        {copiedField === 'ifscCode' ? (
+                          <Check className="w-4 h-4 text-emerald-500" />
+                        ) : (
+                          <Copy className="w-4 h-4 text-slate-400" />
+                        )}
+                      </button>
+                    </div>
+
+                    <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-900 rounded-lg">
+                      <div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">UPI ID</p>
+                        <p className="text-slate-900 dark:text-white font-mono font-medium">{BANK_DETAILS.upiId}</p>
+                      </div>
+                      <button
+                        onClick={() => handleCopyToClipboard(BANK_DETAILS.upiId, 'upiId')}
+                        className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                      >
+                        {copiedField === 'upiId' ? (
+                          <Check className="w-4 h-4 text-emerald-500" />
+                        ) : (
+                          <Copy className="w-4 h-4 text-slate-400" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center">
+                    <div className="bg-white p-4 rounded-xl shadow-md">
+                      <img 
+                        src={QR_CODE_URL} 
+                        alt="Payment QR Code"
+                        className="w-64 h-64 object-contain"
+                        onError={(e) => {
+                          e.currentTarget.src = 'https://via.placeholder.com/256?text=QR+Code+Not+Available';
+                        }}
+                      />
+                    </div>
+                    <p className="mt-4 text-sm text-slate-600 dark:text-slate-400 text-center">
+                      Scan this QR code to make payment
+                    </p>
+                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-500 text-center font-mono">
+                      UPI ID: {BANK_DETAILS.upiId}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Quick Pay Section */}
-        {preview && preview.months.length > 0 && (
+        {hasAmountToPay ? (
           <div className="mb-6">
             <h3 className="text-slate-900 dark:text-white text-lg font-bold mb-3 flex items-center gap-2">
               <Zap className="text-[#135bec] w-5 h-5" />
@@ -485,6 +667,21 @@ export default function BrotherDashboard() {
               </div>
             </div>
           </div>
+        ) : (
+          /* Show this message when all contributions are paid */
+          !hasPendingContribution && (
+            <div className="mb-6">
+              <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-6 text-center">
+                <CheckCircle className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
+                <h3 className="text-lg font-bold text-emerald-700 dark:text-emerald-400 mb-2">
+                  All Caught Up!
+                </h3>
+                <p className="text-emerald-600 dark:text-emerald-500 text-sm">
+                  You have no pending contributions. Thank you for your timely payments!
+                </p>
+              </div>
+            </div>
+          )
         )}
 
         {/* Recent Activity - Using summary data */}
@@ -631,18 +828,10 @@ export default function BrotherDashboard() {
                 </div>
               )}
 
-              {/* Success Message */}
-              {submitSuccess && (
-                <div className="mb-4 p-3 bg-emerald-100 border border-emerald-400 text-emerald-700 rounded-lg text-sm flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4" />
-                  Contribution submitted successfully! Redirecting...
-                </div>
-              )}
-
               {/* Submit Button */}
               <button
                 onClick={handleSubmitContribution}
-                disabled={isSubmitting || selectedFiles.length === 0 || submitSuccess}
+                disabled={isSubmitting || selectedFiles.length === 0}
                 className="w-full bg-[#135bec] text-white font-bold py-4 rounded-xl shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isSubmitting ? (
@@ -658,6 +847,28 @@ export default function BrotherDashboard() {
                 )}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Dialog */}
+      {showSuccessDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[60]">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-8 text-center animate-in fade-in zoom-in duration-300">
+            <div className="flex justify-center mb-4">
+              <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center animate-bounce">
+                <CheckCircle className="w-12 h-12 text-emerald-600 dark:text-emerald-400" />
+              </div>
+            </div>
+            <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
+              Success!
+            </h3>
+            <p className="text-slate-600 dark:text-slate-400 mb-2">
+              Your contribution has been submitted successfully!
+            </p>
+            <p className="text-sm text-slate-500 dark:text-slate-500">
+              Redirecting...
+            </p>
           </div>
         </div>
       )}
